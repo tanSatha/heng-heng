@@ -1,0 +1,64 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id         String          @id @default(uuid())
+  email      String          @unique
+  username   String?         @unique
+  avatarUrl  String?         @map("avatar_url")
+  password   String?
+  providerId String?         @unique @map("provider_id")
+  createdAt  DateTime        @default(now()) @map("created_at")
+  records    LotteryRecord[]
+
+  @@map("users")
+}
+
+model Temple {
+  id        Int             @id @default(autoincrement())
+  name      String          @unique
+  totalHits Int             @default(0) @map("total_hits")
+  records   LotteryRecord[]
+
+  @@map("temples")
+}
+
+enum LotteryType {
+  THAI
+  LAO
+}
+
+model LotteryRecord {
+  id       Int         @id @default(autoincrement())
+  numbers    String
+  type       LotteryType
+  drawDate   DateTime @map("draw_date")
+  templeName String?  @map("temple_name")
+  photoUrl   String?  @map("photo_url")
+  photoUrl2  String?  @map("photo_url_2")
+  createdAt  DateTime @default(now()) @map("created_at")
+  userId   String      @map("user_id")
+  templeId Int         @map("temple_id")
+
+  user   User   @relation(fields: [userId], references: [id])
+  temple Temple @relation(fields: [templeId], references: [id])
+
+  @@map("lottery_records")
+}
+
+model LotteryResult {
+  id          Int         @id @default(autoincrement())
+  type        LotteryType
+  drawDate    DateTime    @map("draw_date")
+  resultData  Json        @map("result_data")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  @@unique([type, drawDate])
+  @@map("lottery_results")
+}

@@ -1,0 +1,101 @@
+import { Controller, Post, Body, UseGuards, Request, Get, Req, Res, UnauthorizedException, Patch, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+import { AuthService } from './auth.service';
+import { Response } from 'express';
+import { ConfigService } from '@nestjs/config';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname } from 'path';
+
+@Controller('auth')
+export class AuthController {
+  constructor(
+    private authService: AuthService,
+    private configService: ConfigService
+  ) {}
+
+  @Post('upload-avatar')
+  @UseGuards(AuthGuard('jwt'))
+  @UseInterceptors(FileInterceptor('file', {
+    storage: diskStorage({
+      destination: './uploads/avatars',
+      filename: (req, file, cb) => {
+        const randomName = Array(32).fill(null).map(() => (Math.round(Math.random() * 16)).toString(16)).join('');
+        return cb(null, `${randomName}${extname(file.originalname)}`);
+      }
+    })
+  }))
+  uploadAvatar(@UploadedFile() file: any) {
+    return {
+      url: `${process.env.BACKEND_URL || 'http://localhost:4000'}/uploads/avatars/${file.filename}`
+    };
+  }
+
+  @Post('login')
+  async login(@Body() req) {
+    const user = await this.authService.validateUser(req.email, req.password);
+    if (!user) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+    return this.authService.login(user);
+  }
+
+  @Post('register')
+  async register(@Body() req) {
+    return this.authService.register(req.email, req.password);
+  }
+
+  @Get('google')
+  @UseGuards(AuthGuard('google'))
+  async googleAuth(@Req() req) {}
+
+  @Get('google/callback')
+  @UseGuards(AuthGuard('google'))
+  async googleAuthRedirect(@Req() req, @Res() res) {
+    const result = (await this.authService.googleLogin(req)) as any;
+    const frontendUrl = this.configService.get('FRONTEND_URL') || 'http://localhost:3000';
+
+    if (!result || !result.access_token) {
+        return res.redirect(`${frontendUrl}/login?error=GoogleAuthFailed`);
+    }
+    const token = result.access_token;
+    res.redirect(`${frontendUrl}/auth/callback?token=${token}`);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get('profile')
+  getProfile(@Request() req) {
+    return this.authService.getMe(req.user.userId);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Patch('profile')
+  updateProfile(@Req() req, @Body() body: { username?: string; avatarUrl?: string }) {
+    return this.authService.updateProfile(req.user.userId, body);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Post('set-username')
+  async setUsername(@Request() req, @Body('username') username: string) {
+    // req.user from JwtStrategy = { userId: ..., email: ... }
+    return this.authService.setUsername(req.user.userId, username);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get('me')
+  getMe(@Request() req) {
+    return this.authService.getMe(req.user.userId);
+  }
+
+  @Post('forgot-password')
+  async forgotPassword(@Body('email') email: string) {
+    if (!email) throw new UnauthorizedException('Email is required');
+    return this.authService.forgotPassword(email);
+  }
+
+  @Post('reset-password')
+  async resetPassword(@Body() body: { token: string; newPassword: string }) {
+    if (!body.token || !body.newPassword) throw new UnauthorizedException('Token and New Password required');
+    return this.authService.resetPassword(body.token, body.newPassword);
+  }
+}
