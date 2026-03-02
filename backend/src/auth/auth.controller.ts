@@ -25,9 +25,12 @@ export class AuthController {
       }
     })
   }))
-  uploadAvatar(@UploadedFile() file: any) {
+  uploadAvatar(@Req() req, @UploadedFile() file: any) {
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+    const host = req.headers.host;
+    const backendUrl = process.env.BACKEND_URL || `${protocol}://${host}`;
     return {
-      url: `${process.env.BACKEND_URL || 'http://localhost:4000'}/uploads/avatars/${file.filename}`
+      url: `${backendUrl}/uploads/avatars/${file.filename}`
     };
   }
 

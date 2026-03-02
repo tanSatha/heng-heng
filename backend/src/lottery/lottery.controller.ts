@@ -192,8 +192,10 @@ export class LotteryController {
       }
     })
   }))
-  uploadLotteryImage(@UploadedFile() file: any) {
-    const backendUrl = process.env.BACKEND_URL || 'http://localhost:4000';
+  uploadLotteryImage(@Req() req, @UploadedFile() file: any) {
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+    const host = req.headers.host;
+    const backendUrl = process.env.BACKEND_URL || `${protocol}://${host}`;
     return {
       url: `${backendUrl}/uploads/lottery/${file.filename}`
     };
