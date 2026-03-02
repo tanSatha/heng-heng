@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, UseGuards, Request, Query, UploadedFile, UseInterceptors, Param } from '@nestjs/common';
+import { Controller, Post, Get, Body, UseGuards, Request, Req, Query, UploadedFile, UseInterceptors, Param } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
