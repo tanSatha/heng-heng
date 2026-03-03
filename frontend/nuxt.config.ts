@@ -29,7 +29,7 @@ export default defineNuxtConfig({
         url: process.env.SUPABASE_URL,
         key: process.env.SUPABASE_KEY,
       },
-      apiBase: process.env.API_BASE || (process.env.NODE_ENV === 'production' ? 'https://heng-hengheng-heng-api.onrender.com' : 'http://localhost:4000'),
+      apiBase: process.env.NUXT_PUBLIC_API_BASE || process.env.API_BASE || 'https://heng-hengheng-heng-api.onrender.com',
     },
   },
   future: {
