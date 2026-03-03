@@ -1,6 +1,6 @@
 import { Controller, Post, Get, Body, UseGuards, Request, Req, Query, UploadedFile, UseInterceptors, Param } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
+import { memoryStorage } from 'multer';
 import { extname } from 'path';
 import { LotteryService } from './lottery.service';
 import { AuthGuard } from '@nestjs/passport';
@@ -8,13 +8,15 @@ import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { LotteryType } from '@prisma/client';
 import { firstValueFrom } from 'rxjs';
+import { SupabaseService } from '../supabase.service';
 
 @Controller('lottery')
 export class LotteryController {
   constructor(
     private readonly lotteryService: LotteryService,
     private readonly httpService: HttpService,
-    private readonly configService: ConfigService
+    private readonly configService: ConfigService,
+    private readonly supabaseService: SupabaseService,
   ) {}
 
   @UseGuards(AuthGuard('jwt'))
@@ -101,61 +103,66 @@ export class LotteryController {
 
       // 2. Use Overpass API (OpenStreetMap) - Free & No Key required
       // Searches for temples (amenity=place_of_worship) within 5km
-      try {
-         const radius = keyword ? 10000 : 5000;
-         // Clean keyword for regex search
-         const cleanKeyword = keyword ? keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : '';
-         const tag = keyword 
-            ? `["name"~"${cleanKeyword}",i]` // Case insensitive regex 
-            : `["amenity"="place_of_worship"]`;
+      // Multiple servers for reliability (Render IP can be rate-limited)
+      const overpassServers = [
+        'https://overpass.kumi.systems/api/interpreter',
+        'https://overpass-api.de/api/interpreter',
+        'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+      ];
 
-         // Query nodes, ways, and relations (nwr) to find all types of objects
-         const query = `
-            [out:json][timeout:10];
-            (
-              nwr${tag}(around:${radius},${lat},${lng});
-            );
-            out center 30;
-         `;
+      const radius = keyword ? 10000 : 5000;
+      const cleanKeyword = keyword ? keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : '';
+      const tag = keyword 
+         ? `["name"~"${cleanKeyword}",i]`
+         : `["amenity"="place_of_worship"]`;
 
-         const { data } = await firstValueFrom(
-            this.httpService.get(
-               `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`,
-               { timeout: 12000 }
-            )
+      const query = `
+         [out:json][timeout:10];
+         (
+           nwr${tag}(around:${radius},${lat},${lng});
          );
+         out center 30;
+      `;
 
-         if (data && data.elements && data.elements.length > 0) {
-            return data.elements.map((el: any) => {
-               // Get coordinates: direct lat/lon for nodes, center.lat/lon for ways/relations
-               const pLat = el.lat || el.center?.lat;
-               const pLon = el.lon || el.center?.lon;
+      for (const server of overpassServers) {
+        try {
+          const { data } = await firstValueFrom(
+             this.httpService.get(
+                `${server}?data=${encodeURIComponent(query)}`,
+                { timeout: 12000 }
+             )
+          );
 
-               if (!pLat || !pLon) return null;
+          if (data && data.elements && data.elements.length > 0) {
+             return data.elements.map((el: any) => {
+                const pLat = el.lat || el.center?.lat;
+                const pLon = el.lon || el.center?.lon;
+                if (!pLat || !pLon) return null;
 
-               // Haversine formula
-               const R = 6371; 
-               const dLat = (pLat - Number(lat)) * Math.PI / 180;
-               const dLon = (pLon - Number(lng)) * Math.PI / 180;
-               const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                         Math.cos(Number(lat) * Math.PI / 180) * Math.cos(pLat * Math.PI / 180) * 
-                         Math.sin(dLon/2) * Math.sin(dLon/2); 
-               const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
-               const dist = R * c; // km
+                const R = 6371; 
+                const dLat = (pLat - Number(lat)) * Math.PI / 180;
+                const dLon = (pLon - Number(lng)) * Math.PI / 180;
+                const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                          Math.cos(Number(lat) * Math.PI / 180) * Math.cos(pLat * Math.PI / 180) * 
+                          Math.sin(dLon/2) * Math.sin(dLon/2); 
+                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+                const dist = R * c;
 
-               return {
-                  name: el.tags?.name || 'สถานที่ศักดิ์สิทธิ์ (ไม่ระบุชื่อ)',
-                  vicinity: el.tags?.['addr:city'] || 'ใกล้ฉัน',
-                  distanceVal: dist, // for sorting
-                  distance: dist < 1 ?(`${(dist*1000).toFixed(0)} ม.`) : (`${dist.toFixed(1)} กม.`)
-               };
-            })
-            .filter((item: any) => item && item.name !== 'สถานที่ศักดิ์สิทธิ์ (ไม่ระบุชื่อ)')
-            .sort((a: any, b: any) => a.distanceVal - b.distanceVal)
-            .slice(0, limitParams || 30);
-         }
-      } catch (overpassError) {
-          console.error('Overpass API Error:', overpassError.message);
+                return {
+                   name: el.tags?.name || 'สถานที่ศักดิ์สิทธิ์ (ไม่ระบุชื่อ)',
+                   vicinity: el.tags?.['addr:city'] || 'ใกล้ฉัน',
+                   distanceVal: dist,
+                   distance: dist < 1 ?(`${(dist*1000).toFixed(0)} ม.`) : (`${dist.toFixed(1)} กม.`)
+                };
+             })
+             .filter((item: any) => item && item.name !== 'สถานที่ศักดิ์สิทธิ์ (ไม่ระบุชื่อ)')
+             .sort((a: any, b: any) => a.distanceVal - b.distanceVal)
+             .slice(0, limitParams || 30);
+          }
+        } catch (overpassError) {
+            console.error(`Overpass server ${server} failed:`, overpassError.message);
+            continue; // Try next server
+        }
       }
 
       // 3. Fallback: No Data
@@ -184,21 +191,21 @@ export class LotteryController {
 
   @Post('upload')
   @UseInterceptors(FileInterceptor('file', {
-    storage: diskStorage({
-      destination: './uploads/lottery',
-      filename: (req, file, cb) => {
-        const randomName = Array(32).fill(null).map(() => (Math.round(Math.random() * 16)).toString(16)).join('');
-        return cb(null, `${randomName}${extname(file.originalname)}`);
-      }
-    })
+    storage: memoryStorage(),
   }))
-  uploadLotteryImage(@Req() req, @UploadedFile() file: any) {
-    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
-    const host = req.headers.host;
-    const backendUrl = process.env.BACKEND_URL || `${protocol}://${host}`;
-    return {
-      url: `${backendUrl}/uploads/lottery/${file.filename}`
-    };
+  async uploadLotteryImage(@UploadedFile() file: any) {
+    const randomName = Array(32).fill(null).map(() => (Math.round(Math.random() * 16)).toString(16)).join('');
+    const fileName = `${randomName}${extname(file.originalname)}`;
+    const filePath = `lottery/${fileName}`;
+
+    const publicUrl = await this.supabaseService.uploadFile(
+      'uploads',
+      filePath,
+      file.buffer,
+      file.mimetype,
+    );
+
+    return { url: publicUrl };
   }
 
   @UseGuards(AuthGuard('jwt'))

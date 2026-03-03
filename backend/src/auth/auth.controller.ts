@@ -4,34 +4,36 @@ import { AuthService } from './auth.service';
 import { Response } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
+import { memoryStorage } from 'multer';
 import { extname } from 'path';
+import { SupabaseService } from '../supabase.service';
 
 @Controller('auth')
 export class AuthController {
   constructor(
     private authService: AuthService,
-    private configService: ConfigService
+    private configService: ConfigService,
+    private supabaseService: SupabaseService,
   ) {}
 
   @Post('upload-avatar')
   @UseGuards(AuthGuard('jwt'))
   @UseInterceptors(FileInterceptor('file', {
-    storage: diskStorage({
-      destination: './uploads/avatars',
-      filename: (req, file, cb) => {
-        const randomName = Array(32).fill(null).map(() => (Math.round(Math.random() * 16)).toString(16)).join('');
-        return cb(null, `${randomName}${extname(file.originalname)}`);
-      }
-    })
+    storage: memoryStorage(),
   }))
-  uploadAvatar(@Req() req, @UploadedFile() file: any) {
-    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
-    const host = req.headers.host;
-    const backendUrl = process.env.BACKEND_URL || `${protocol}://${host}`;
-    return {
-      url: `${backendUrl}/uploads/avatars/${file.filename}`
-    };
+  async uploadAvatar(@UploadedFile() file: any) {
+    const randomName = Array(32).fill(null).map(() => (Math.round(Math.random() * 16)).toString(16)).join('');
+    const fileName = `${randomName}${extname(file.originalname)}`;
+    const filePath = `avatars/${fileName}`;
+
+    const publicUrl = await this.supabaseService.uploadFile(
+      'uploads',
+      filePath,
+      file.buffer,
+      file.mimetype,
+    );
+
+    return { url: publicUrl };
   }
 
   @Post('login')

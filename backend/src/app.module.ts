@@ -9,6 +9,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
+import { SupabaseModule } from './supabase.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { join } from 'path';
       serveRoot: '/uploads',
     }),
     PrismaModule,
+    SupabaseModule,
     ConfigModule.forRoot({ isGlobal: true }),
     ScheduleModule.forRoot(),
     AuthModule,
