@@ -93,7 +93,7 @@ const formatDate = (dateString: string) => {
               <div class="inline-block px-3 py-1 bg-slate-50 rounded-full text-xs font-bold text-slate-400 mb-4 tracking-wider uppercase">
                 งวดประจำวันที่
               </div>
-              <h3 class="text-lg font-bold text-slate-700 mb-6">{{ formatDate(lottery.draw_date) }}</h3>
+              <h3 class="text-lg font-bold text-slate-700 mb-6">{{ formatDate(lottery.drawDate) }}</h3>
               
               <div class="relative py-2">
                 <span class="absolute top-0 left-1/2 -translate-x-1/2 text-[10px] font-bold text-amber-500 tracking-[0.3em] uppercase opacity-80">Lucky No.</span>
@@ -125,7 +125,7 @@ const formatDate = (dateString: string) => {
                  <span class="text-xs font-bold uppercase tracking-wide">สถานที่ขอพร</span>
               </div>
               <div class="font-bold text-slate-800 text-lg leading-tight truncate pr-2">
-                {{ lottery.temple_name || '-' }}
+                {{ lottery.temple?.name || lottery.templeName || '-' }}
               </div>
               <div class="text-xs text-slate-400 mt-1 truncate pr-2">
                 {{ lottery.location || 'ไม่ได้ระบุพิกัด' }}
@@ -134,22 +134,22 @@ const formatDate = (dateString: string) => {
         </div>
 
         <!-- 3. Photo Gallery Card -->
-        <div v-if="lottery.photo_url || lottery.photo_url_2" class="bg-white rounded-3xl shadow-sm border border-slate-100 p-5">
+        <div v-if="lottery.photoUrl || lottery.photoUrl2" class="bg-white rounded-3xl shadow-sm border border-slate-100 p-5">
            <div class="flex items-center justify-between mb-4">
               <h3 class="font-bold text-slate-700 flex items-center gap-2">
                 <UIcon name="i-heroicons-photo" class="text-amber-500" />
                 รูปภาพบันทึกความทรงจำ
               </h3>
-              <span class="text-xs text-slate-400 bg-slate-50 px-2 py-1 rounded-md">{{ (lottery.photo_url && lottery.photo_url_2) ? '2 รูป' : '1 รูป' }}</span>
+              <span class="text-xs text-slate-400 bg-slate-50 px-2 py-1 rounded-md">{{ (lottery.photoUrl && lottery.photoUrl2) ? '2 รูป' : '1 รูป' }}</span>
            </div>
            
            <div class="space-y-4">
-              <div v-if="lottery.photo_url" class="rounded-2xl overflow-hidden border border-slate-100 group relative">
-                 <img :src="lottery.photo_url" class="w-full h-auto object-cover transition-transform duration-700 group-hover:scale-105" />
+              <div v-if="lottery.photoUrl" class="rounded-2xl overflow-hidden border border-slate-100 group relative">
+                 <img :src="lottery.photoUrl" class="w-full h-auto object-cover transition-transform duration-700 group-hover:scale-105" />
                  <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/50 to-transparent p-4 opacity-0 group-hover:opacity-100 transition-opacity"></div>
               </div>
-              <div v-if="lottery.photo_url_2" class="rounded-2xl overflow-hidden border border-slate-100 group relative">
-                 <img :src="lottery.photo_url_2" class="w-full h-auto object-cover transition-transform duration-700 group-hover:scale-105" />
+              <div v-if="lottery.photoUrl2" class="rounded-2xl overflow-hidden border border-slate-100 group relative">
+                 <img :src="lottery.photoUrl2" class="w-full h-auto object-cover transition-transform duration-700 group-hover:scale-105" />
                  <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/50 to-transparent p-4 opacity-0 group-hover:opacity-100 transition-opacity"></div>
               </div>
            </div>
@@ -158,7 +158,7 @@ const formatDate = (dateString: string) => {
         <!-- Meta Info -->
         <div class="text-center pt-4 opacity-40 hover:opacity-100 transition-opacity">
            <p class="text-[10px] text-slate-500 font-mono">
-             Reference ID: {{ lottery.id }} • Created: {{ new Date(lottery.created_at).toLocaleDateString('th-TH') }}
+             Reference ID: {{ lottery.id }} • Created: {{ new Date(lottery.createdAt).toLocaleDateString('th-TH') }}
            </p>
         </div>
 

@@ -49,17 +49,30 @@ const emit = defineEmits(['refresh'])
         class="record-card group relative overflow-hidden cursor-pointer"
         :style="{ animationDelay: `${index * 50}ms` }"
       >
-        <div class="flex items-center gap-4 relative z-10">
-          <!-- Number Badge -->
-          <div class="number-badge shadow-md group-hover:scale-105 transition-transform duration-300">
-            <span class="text-2xl font-black tracking-[0.1em]">{{ record.numbers.replace(/,/g, ', ').replace(/\s+/g, ' ') }}</span>
+        <div class="flex items-center gap-3 relative z-10">
+          <!-- Photo Thumbnail -->
+          <div class="shrink-0 w-16 h-16 rounded-xl overflow-hidden border-2 border-amber-100 shadow-sm group-hover:border-amber-300 transition-colors duration-300">
+            <img 
+              v-if="record.photoUrl || record.photo_url" 
+              :src="record.photoUrl || record.photo_url" 
+              class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+              alt="สลาก"
+            />
+            <div v-else class="w-full h-full bg-gradient-to-br from-amber-50 to-orange-50 flex items-center justify-center">
+              <span class="text-2xl opacity-40">🎫</span>
+            </div>
           </div>
 
-          <!-- Info -->
+          <!-- Number & Info -->
           <div class="flex-1 min-w-0 py-1">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="text-xl font-black text-amber-600 tracking-wide group-hover:text-amber-700 transition-colors">
+                {{ record.numbers.replace(/,/g, ', ').replace(/\s+/g, ' ') }}
+              </span>
+            </div>
             <div class="flex items-center gap-2 mb-1.5">
-              <span class="text-base font-bold text-gray-800 truncate group-hover:text-amber-600 transition-colors">
-                🏛️ {{ record.temple?.name || 'ไม่ทราบวัด' }}
+              <span class="text-sm font-bold text-gray-700 truncate group-hover:text-amber-600 transition-colors">
+                🏛️ {{ record.temple?.name || record.temple_name || 'ไม่ทราบวัด' }}
               </span>
             </div>
             
