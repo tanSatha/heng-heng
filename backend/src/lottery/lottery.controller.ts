@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, UseGuards, Request, Req, Query, UploadedFile, UseInterceptors, Param } from '@nestjs/common';
+import { Controller, Post, Get, Delete, Body, UseGuards, Request, Req, Query, UploadedFile, UseInterceptors, Param } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { extname } from 'path';
@@ -218,6 +218,12 @@ export class LotteryController {
   @Get(':id')
   async getLotteryById(@Request() req, @Param('id') id: string) {
     return this.lotteryService.getLotteryById(Number(id), req.user);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Delete(':id')
+  async deleteRecord(@Request() req, @Param('id') id: string) {
+    return this.lotteryService.deleteRecord(Number(id), req.user);
   }
 
   // Admin / Cron Trigger

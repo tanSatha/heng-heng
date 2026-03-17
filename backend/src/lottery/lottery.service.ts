@@ -147,6 +147,24 @@ export class LotteryService {
     return record;
   }
 
+  async deleteRecord(id: number, userPayload: { userId: string; email?: string }) {
+    const user = await this.prisma.user.findFirst({
+      where: {
+        OR: [{ providerId: userPayload.userId }, { email: userPayload.email }],
+      },
+    });
+
+    if (!user) throw new Error('User not found');
+
+    const record = await this.prisma.lotteryRecord.findUnique({ where: { id } });
+    if (!record || record.userId !== user.id) {
+      throw new Error('Record not found or unauthorized');
+    }
+
+    await this.prisma.lotteryRecord.delete({ where: { id } });
+    return { success: true };
+  }
+
   async getUserWins(userPayload: { userId: string; email?: string }) {
     const user = await this.prisma.user.findFirst({
       where: {
