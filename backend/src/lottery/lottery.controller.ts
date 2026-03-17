@@ -51,130 +51,74 @@ export class LotteryController {
 
   @Get('nearby-places')
   async getNearbyPlaces(
-    @Query('lat') lat: string, 
-    @Query('lng') lng: string, 
+    @Query('lat') lat: string,
+    @Query('lng') lng: string,
     @Query('keyword') keyword?: string,
     @Query('limit') limitArgs?: string
   ) {
     if (!lat || !lng) return [];
-    
-    // Parse limit, default to 20 if not provided
+
     const limitParams = parseInt(limitArgs || '20');
+    const googleApiKey = this.configService.get<string>('GOOGLE_MAPS_API_KEY') || '';
+
+    if (!googleApiKey) {
+      console.error('GOOGLE_MAPS_API_KEY is not set');
+      return [];
+    }
+
+    const calcDist = (pLat: number, pLon: number) => {
+      const R = 6371;
+      const dLat = (pLat - Number(lat)) * Math.PI / 180;
+      const dLon = (pLon - Number(lng)) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) ** 2 +
+        Math.cos(Number(lat) * Math.PI / 180) * Math.cos(pLat * Math.PI / 180) *
+        Math.sin(dLon / 2) ** 2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    };
+
+    const formatResults = (results: any[]) =>
+      results
+        .map((place: any) => {
+          const pLat = place.geometry?.location?.lat;
+          const pLon = place.geometry?.location?.lng;
+          const dist = pLat && pLon ? calcDist(pLat, pLon) : null;
+          return {
+            name: place.name,
+            vicinity: place.vicinity || 'ใกล้ฉัน',
+            distanceVal: dist ?? 9999,
+            distance: dist === null ? 'ใกล้เคียง' : dist < 1 ? `${(dist * 1000).toFixed(0)} ม.` : `${dist.toFixed(1)} กม.`,
+          };
+        })
+        .sort((a: any, b: any) => a.distanceVal - b.distanceVal)
+        .slice(0, limitParams);
+
+    const search = async (params: Record<string, any>) => {
+      const { data } = await firstValueFrom(
+        this.httpService.get('https://maps.googleapis.com/maps/api/place/nearbysearch/json', {
+          params: { location: `${lat},${lng}`, language: 'th', key: googleApiKey, ...params },
+          timeout: 8000,
+        })
+      );
+      return data;
+    };
 
     try {
-      // Use Overpass API (OpenStreetMap) for reliable nearby search
-      // TAT API requires provinceName which we don't have from simple lat/lng without reverse geocoding
-      
-      const tatApiKey = this.configService.get<string>('TAT_API_KEY') || ''; // User needs to set this in .env
-      
-      // Try TAT API First if Key exists
-      if (tatApiKey) {
-         try {
-            const { data } = await firstValueFrom(
-              this.httpService.get(
-                `https://tatapi.tourismthailand.org/tatapi/v5/places/search`, 
-                {
-                  headers: { 
-                    'Authorization': `Bearer ${tatApiKey}`,
-                    'Accept-Language': 'th' 
-                  },
-                  params: {
-                    keyword: keyword || 'วัด',
-                    latitude: lat,
-                    longitude: lng,
-                    limit: limitParams || 20
-                  },
-                  timeout: 4000
-                }
-              )
-            );
-            
-            if (data && data.result) {
-               return data.result.map((item: any) => ({
-                 name: item.place_name,
-                 vicinity: item.location?.province || item.destination || 'ใกล้ฉัน',
-                 distance: item.distance ? `${item.distance} m` : 'ใกล้เคียง'
-               }));
-            }
-         } catch (tatError) {
-            console.error('TAT API Fail, falling back to Overpass:', tatError.message);
-         }
+      // 1st try: place_of_worship + keyword
+      const searchKeyword = keyword || 'วัด';
+      let data = await search({ radius: 10000, type: 'place_of_worship', keyword: searchKeyword });
+
+      // 2nd try: broader keyword only, no type filter
+      if (!data?.results?.length || data.status === 'ZERO_RESULTS') {
+        data = await search({ radius: 10000, keyword: searchKeyword });
       }
 
-      // 2. Use Overpass API (OpenStreetMap) - Free & No Key required
-      // Searches for temples (amenity=place_of_worship) within 5km
-      // Multiple servers for reliability (Render IP can be rate-limited)
-      const overpassServers = [
-        'https://overpass.kumi.systems/api/interpreter',
-        'https://overpass-api.de/api/interpreter',
-        'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
-      ];
+      if (!data?.results?.length) return [];
 
-      const radius = keyword ? 10000 : 5000;
-      const cleanKeyword = keyword ? keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : '';
-      const tag = keyword 
-         ? `["name"~"${cleanKeyword}",i]`
-         : `["amenity"="place_of_worship"]`;
-
-      const query = `
-         [out:json][timeout:10];
-         (
-           nwr${tag}(around:${radius},${lat},${lng});
-         );
-         out center 30;
-      `;
-
-      for (const server of overpassServers) {
-        try {
-          const { data } = await firstValueFrom(
-             this.httpService.get(
-                `${server}?data=${encodeURIComponent(query)}`,
-                { timeout: 12000 }
-             )
-          );
-
-          if (data && data.elements && data.elements.length > 0) {
-             return data.elements.map((el: any) => {
-                const pLat = el.lat || el.center?.lat;
-                const pLon = el.lon || el.center?.lon;
-                if (!pLat || !pLon) return null;
-
-                const R = 6371; 
-                const dLat = (pLat - Number(lat)) * Math.PI / 180;
-                const dLon = (pLon - Number(lng)) * Math.PI / 180;
-                const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                          Math.cos(Number(lat) * Math.PI / 180) * Math.cos(pLat * Math.PI / 180) * 
-                          Math.sin(dLon/2) * Math.sin(dLon/2); 
-                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
-                const dist = R * c;
-
-                return {
-                   name: el.tags?.name || 'สถานที่ศักดิ์สิทธิ์ (ไม่ระบุชื่อ)',
-                   vicinity: el.tags?.['addr:city'] || 'ใกล้ฉัน',
-                   distanceVal: dist,
-                   distance: dist < 1 ?(`${(dist*1000).toFixed(0)} ม.`) : (`${dist.toFixed(1)} กม.`)
-                };
-             })
-             .filter((item: any) => item && item.name !== 'สถานที่ศักดิ์สิทธิ์ (ไม่ระบุชื่อ)')
-             .sort((a: any, b: any) => a.distanceVal - b.distanceVal)
-             .slice(0, limitParams || 30);
-          }
-        } catch (overpassError) {
-            console.error(`Overpass server ${server} failed:`, overpassError.message);
-            continue; // Try next server
-        }
-      }
-
-      // 3. Fallback: No Data
-      return [];
+      return formatResults(data.results);
 
     } catch (error) {
-      console.error('API Error', error.message);
-      // Final Fallback
-      return [
-        { name: 'วัดพระแก้ว (จำลอง)', vicinity: 'กรุงเทพมหานคร', distance: '5.2 กม.' },
-        { name: 'วัดอรุณ', vicinity: 'บางกอกใหญ่', distance: '6.1 กม.' }
-      ];
+      console.error('Google Places API Error:', error.message);
+      return [];
     }
   }
 
