@@ -169,7 +169,14 @@ const signup = async () => {
           </button>
         </form>
 
-        <div class="mt-7 text-center">
+        <div class="mt-5 text-center">
+          <NuxtLink to="/forgot-password" class="text-sm font-medium hover:underline transition-colors duration-300"
+            style="color: #9333ea;">
+            ลืมรหัสผ่าน?
+          </NuxtLink>
+        </div>
+
+        <div class="mt-4 text-center">
           <p class="text-sm" style="color: #6b7280;">
             มีบัญชีอยู่แล้ว?
             <NuxtLink to="/login" class="font-bold cursor-pointer hover:underline pl-1 transition-colors duration-300"

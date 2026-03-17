@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/co
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma.service';
 import * as bcrypt from 'bcrypt';
+import * as nodemailer from 'nodemailer';
 
 @Injectable()
 export class AuthService {
@@ -145,23 +146,58 @@ export class AuthService {
   async forgotPassword(email: string) {
     const user = await this.prisma.user.findUnique({ where: { email } });
     if (!user) {
-      // Don't reveal user existence, just return success-like message
       return { message: 'If email exists, reset link sent.' };
     }
 
-    // Generate temporary token (short expiry, e.g. 15m)
-    // We use a different secret or payload structure if needed, but for simplicity here:
     const payload = { sub: user.id, type: 'reset' };
     const token = this.jwtService.sign(payload, { expiresIn: '15m' });
 
-    // TODO: Send email with link: FRONTEND_URL/reset-password?token=XYZ
-    console.log(`[DEBUG] Reset Token for ${email}: ${token}`);
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const resetLink = `${frontendUrl}/reset-password?token=${token}`;
 
-    // For Dev/Demo: Return token so user can test immediately
-    return { 
-      message: 'Reset link sent (check console/response for dev token)',
-      devToken: token 
-    };
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: Number(process.env.SMTP_PORT) || 587,
+      secure: false,
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+    });
+
+    await transporter.sendMail({
+      from: `"บุ๊คเลข Heng-Heng" <${process.env.SMTP_USER}>`,
+      to: email,
+      subject: '🔑 รีเซ็ตรหัสผ่าน - บุ๊คเลข Heng-Heng',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #f9f5ff; border-radius: 12px;">
+          <div style="text-align: center; margin-bottom: 24px;">
+            <h1 style="color: #7c3aed; font-size: 28px; margin: 0;">🙏 บุ๊คเลข</h1>
+            <p style="color: #6b7280; margin-top: 8px;">Heng-Heng.app</p>
+          </div>
+          <div style="background: white; border-radius: 12px; padding: 32px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+            <h2 style="color: #1f2937; margin-top: 0;">รีเซ็ตรหัสผ่านของคุณ</h2>
+            <p style="color: #4b5563; line-height: 1.6;">
+              เราได้รับคำขอรีเซ็ตรหัสผ่านสำหรับบัญชีของคุณ<br>
+              กดปุ่มด้านล่างเพื่อตั้งรหัสผ่านใหม่
+            </p>
+            <div style="text-align: center; margin: 32px 0;">
+              <a href="${resetLink}"
+                style="background: linear-gradient(135deg, #d97706, #ea580c); color: white; padding: 14px 32px; border-radius: 10px; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">
+                🔑 ตั้งรหัสผ่านใหม่
+              </a>
+            </div>
+            <p style="color: #9ca3af; font-size: 13px; line-height: 1.5;">
+              ลิงก์นี้จะหมดอายุใน <strong>15 นาที</strong><br>
+              หากคุณไม่ได้ขอรีเซ็ตรหัสผ่าน กรุณาเพิกเฉยต่ออีเมลนี้
+            </p>
+          </div>
+          <p style="text-align: center; color: #9ca3af; font-size: 12px; margin-top: 20px;">✨ HENG-HENG.APP ✨</p>
+        </div>
+      `,
+    });
+
+    return { message: 'Reset link sent to your email.' };
   }
 
   async resetPassword(token: string, newPass: string) {
