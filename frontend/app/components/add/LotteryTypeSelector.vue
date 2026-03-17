@@ -3,28 +3,25 @@ defineProps<{
   modelValue: string
 }>()
 const emit = defineEmits(['update:modelValue'])
-
-const lotteryTypes = [
-  { value: 'THAI', label: 'หวยรัฐบาลไทย' },
-  { value: 'LAO', label: 'หวยลาว' }
-]
 </script>
 
 <template>
   <div>
     <label class="block text-sm font-bold text-gray-700 mb-2">ประเภทหวย</label>
-    <div class="grid grid-cols-2 gap-2">
-      <button 
-        v-for="type in lotteryTypes" 
-        :key="type.value"
+    <div class="flex p-1 bg-white rounded-full shadow-sm border border-gray-100">
+      <button
         type="button"
-        @click="emit('update:modelValue', type.value)"
-        class="py-3 rounded-xl text-sm font-bold transition-all border-2"
-        :class="modelValue === type.value 
-          ? 'bg-amber-100 border-amber-400 text-amber-700 shadow-sm' 
-          : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'"
+        @click="emit('update:modelValue', 'THAI')"
+        :class="['flex-1 py-3 px-4 rounded-full text-sm font-bold transition-all', modelValue === 'THAI' ? 'bg-amber-500 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50']"
       >
-        {{ type.label }}
+        🇹🇭 หวยรัฐบาลไทย
+      </button>
+      <button
+        type="button"
+        @click="emit('update:modelValue', 'LAO')"
+        :class="['flex-1 py-3 px-4 rounded-full text-sm font-bold transition-all', modelValue === 'LAO' ? 'bg-amber-500 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50']"
+      >
+        🇱🇦 หวยลาวพัฒนา
       </button>
     </div>
   </div>
