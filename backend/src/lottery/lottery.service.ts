@@ -47,16 +47,12 @@ export class LotteryService {
       throw new Error('Could not find or create user');
     }
 
-    // 2. Find or Create Temple
-    let temple = await this.prisma.temple.findUnique({
+    // 2. Find or Create Temple (upsert to handle race condition when submitting multiple types simultaneously)
+    const temple = await this.prisma.temple.upsert({
       where: { name: data.temple_name },
+      update: {},
+      create: { name: data.temple_name },
     });
-
-    if (!temple) {
-      temple = await this.prisma.temple.create({
-        data: { name: data.temple_name },
-      });
-    }
 
     // 3. Create Lottery Record
     let dbType: LotteryType = LotteryType.THAI;
@@ -65,17 +61,18 @@ export class LotteryService {
 
     const targetDate = new Date(data.draw_date);
     
-    // Validate if the user already submitted for this draw
+    // Validate: same user + same temple + same draw period is not allowed
     const existing = await this.prisma.lotteryRecord.findFirst({
        where: {
           userId: user.id,
           type: dbType,
-          drawDate: targetDate
+          drawDate: targetDate,
+          templeName: data.temple_name
        }
     });
 
     if (existing) {
-       throw new Error('คุณได้เพิ่มเลขในงวดนี้ไปแล้ว สามารถระบุ 2 ช่องในครั้งเดียว');
+       throw new Error('คุณได้บันทึกวัดนี้ในงวดนี้ไปแล้ว ไม่สามารถบันทึกวัดเดิมซ้ำในงวดเดียวกันได้');
     }
 
     return this.prisma.lotteryRecord.create({

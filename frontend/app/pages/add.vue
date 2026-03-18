@@ -33,16 +33,8 @@ const getNextThaiDraw = () => {
   const d = today.getDate()
   const m = today.getMonth()
   const y = today.getFullYear()
-  if (d < 1 || d < 16) {
-    // next is 16th this month or 1st next month
-    const next16 = new Date(y, m, 16)
-    if (next16 >= today) return toDateStr(next16)
-  }
-  if (d < 16) return toDateStr(new Date(y, m, 16))
-  if (d === 16 || d > 1) {
-    const next1 = new Date(y, m + 1, 1)
-    if (next1 >= today) return toDateStr(next1)
-  }
+  if (d <= 1) return toDateStr(new Date(y, m, 1))
+  if (d <= 16) return toDateStr(new Date(y, m, 16))
   return toDateStr(new Date(y, m + 1, 1))
 }
 
@@ -64,18 +56,16 @@ const getNextDrawDate = (type: string) =>
 
 // Form State
 const form = ref({
-  type: 'THAI',
+  types: ['THAI'] as string[],
   number1: '',
   number2: '',
   templeName: '',
-  drawDate: getNextThaiDraw(),
-  photoUrl: '',
-  photoUrl1: '',
-  photoUrl2: ''
-})
-
-watch(() => form.value.type, (newType) => {
-  form.value.drawDate = getNextDrawDate(newType)
+  drawDateThai: getNextThaiDraw(),
+  drawDateLao: getNextLaoDraw(),
+  photoThaiUrl1: '',
+  photoThaiUrl2: '',
+  photoLaoUrl1: '',
+  photoLaoUrl2: '',
 })
 
 const closeSuccessModal = () => {
@@ -85,40 +75,50 @@ const closeSuccessModal = () => {
 
 const handleSubmit = async () => {
   if (!form.value.number1 && !form.value.number2) {
-      alert('กรุณาระบุเลขอย่างน้อย 1 ช่อง')
-      return
+    alert('กรุณาระบุเลขอย่างน้อย 1 ช่อง')
+    return
   }
   if (!form.value.templeName) {
-      alert('กรุณาระบุชื่อวัด')
-      return
+    alert('กรุณาระบุชื่อวัด')
+    return
   }
-  
-  // Debug Date Confirmation
-  const selectedDateStr = form.value.drawDate;
-  if (!confirm(`ยืนยันบันทึกเลขเด็ด\nงวดวันที่: ${selectedDateStr}\n(หากวันที่ผิด กรุณากด Cancel แล้วเปลี่ยนวันที่)`)) {
-     return;
+
+  const types = form.value.types
+  const dateLines = types.map(t => {
+    const date = t === 'THAI' ? form.value.drawDateThai : form.value.drawDateLao
+    const label = t === 'THAI' ? '🇹🇭 ไทย' : '🇱🇦 ลาว'
+    return `${label}: ${date}`
+  }).join('\n')
+
+  if (!confirm(`ยืนยันบันทึกเลขเด็ด\n${dateLines}\n(หากวันที่ผิด กรุณากด Cancel แล้วเปลี่ยนวันที่)`)) {
+    return
   }
 
   submitting.value = true
   errorMessage.value = 'กรุณาลองใหม่อีกครั้ง'
   try {
     const numbers = [form.value.number1, form.value.number2].filter(n => n).join(', ')
-    
-    await $fetch(`${runtimeConfig.public.apiBase}/lottery`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${authStore.token}` },
-      body: {
-        numbers: numbers,
-        type: form.value.type,
-        draw_date: new Date(form.value.drawDate).toISOString(),
-        temple_name: form.value.templeName,
-        photo_url: form.value.photoUrl1 || form.value.photoUrl,
-        photo_url_2: form.value.photoUrl2
-      }
-    })
-    
+
+    await Promise.all(types.map(type => {
+      const drawDate = type === 'THAI' ? form.value.drawDateThai : form.value.drawDateLao
+      const photoUrl1 = type === 'THAI' ? form.value.photoThaiUrl1 : form.value.photoLaoUrl1
+      const photoUrl2 = type === 'THAI' ? form.value.photoThaiUrl2 : form.value.photoLaoUrl2
+      return $fetch(`${runtimeConfig.public.apiBase}/lottery`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${authStore.token}` },
+        body: {
+          numbers,
+          type,
+          draw_date: new Date(drawDate).toISOString(),
+          temple_name: form.value.templeName,
+          photo_url: photoUrl1,
+          photo_url_2: photoUrl2
+        }
+      })
+    }))
+
     showSuccessModal.value = true
-    
+
   } catch (error: any) {
     console.error(error)
     errorMessage.value = error.response?._data?.message || error.data?.message || 'กรุณาลองใหม่อีกครั้ง'
@@ -144,20 +144,39 @@ const handleSubmit = async () => {
     <!-- Main Form -->
     <div class="glass-card p-6 animate-fade-in-up space-y-5 shadow-lg relative z-10">
       
-      <LotteryTypeSelector v-model="form.type" />
-      
-      <NumberInput 
-        v-model:number1="form.number1" 
-        v-model:number2="form.number2" 
+      <LotteryTypeSelector v-model="form.types" />
+
+      <NumberInput
+        v-model:number1="form.number1"
+        v-model:number2="form.number2"
+      />
+
+      <TempleSelector v-model="form.templeName" />
+
+      <DateSelector
+        v-if="form.types.includes('THAI')"
+        v-model="form.drawDateThai"
+        lotteryType="THAI"
+        :label="form.types.length === 2 ? '🇹🇭 งวดหวยรัฐบาลไทย' : undefined"
+      />
+      <DateSelector
+        v-if="form.types.includes('LAO')"
+        v-model="form.drawDateLao"
+        lotteryType="LAO"
+        :label="form.types.length === 2 ? '🇱🇦 งวดหวยลาวพัฒนา' : undefined"
       />
       
-      <TempleSelector v-model="form.templeName" />
-      
-      <DateSelector v-model="form.drawDate" :lotteryType="form.type" />
-      
-      <ImageUploader 
-        v-model:photoUrl1="form.photoUrl1" 
-        v-model:photoUrl2="form.photoUrl2" 
+      <ImageUploader
+        v-if="form.types.includes('THAI')"
+        v-model:photoUrl1="form.photoThaiUrl1"
+        v-model:photoUrl2="form.photoThaiUrl2"
+        :label="form.types.length === 2 ? '🇹🇭 รูปหวยรัฐบาลไทย (2 รูป)' : undefined"
+      />
+      <ImageUploader
+        v-if="form.types.includes('LAO')"
+        v-model:photoUrl1="form.photoLaoUrl1"
+        v-model:photoUrl2="form.photoLaoUrl2"
+        :label="form.types.length === 2 ? '🇱🇦 รูปหวยลาวพัฒนา (2 รูป)' : undefined"
       />
 
     </div>

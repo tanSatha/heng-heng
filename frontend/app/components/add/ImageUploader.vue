@@ -2,6 +2,7 @@
 const props = defineProps<{
   photoUrl1: string
   photoUrl2: string
+  label?: string
 }>()
 const emit = defineEmits(['update:photoUrl1', 'update:photoUrl2'])
 
@@ -66,7 +67,7 @@ const clearPhoto = (index: 1 | 2) => {
 
 <template>
   <div>
-    <label class="block text-sm font-bold text-gray-700 mb-2">รูปถ่ายเลขธูป / ปิงปอง (2 รูป)</label>
+    <label class="block text-sm font-bold text-gray-700 mb-2">{{ label || 'รูปถ่ายเลขธูป / ปิงปอง (2 รูป)' }}</label>
     <div class="grid grid-cols-2 gap-4">
 
       <!-- Slot 1 & 2 -->

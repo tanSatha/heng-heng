@@ -8,7 +8,8 @@ import { computed, onMounted } from 'vue'
 
 const props = defineProps<{
   modelValue: string,
-  lotteryType?: string
+  lotteryType?: string,
+  label?: string
 }>()
 
 const emit = defineEmits(['update:modelValue'])
@@ -79,7 +80,7 @@ const formattedDate = computed(() => {
 
 <template>
   <div class="mb-4 relative" ref="calendarRef">
-    <label class="block text-sm font-bold text-gray-700 mb-2">งวดวันที่ <span class="text-red-500">*</span></label>
+    <label class="block text-sm font-bold text-gray-700 mb-2">{{ label || 'งวดวันที่' }} <span class="text-red-500">*</span></label>
     
     <!-- Input Button -->
     <button 
