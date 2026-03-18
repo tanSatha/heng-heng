@@ -97,9 +97,9 @@ const handleSubmit = async () => {
   try {
     const numbers = [form.value.number1, form.value.number2].filter(n => n).join(', ')
 
-    await Promise.all(types.map(type => {
+    for (const type of types) {
       const drawDate = type === 'THAI' ? form.value.drawDateThai : form.value.drawDateLao
-      return $fetch(`${runtimeConfig.public.apiBase}/lottery`, {
+      await $fetch(`${runtimeConfig.public.apiBase}/lottery`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${authStore.token}` },
         body: {
@@ -111,7 +111,7 @@ const handleSubmit = async () => {
           photo_url_2: form.value.photoUrl2
         }
       })
-    }))
+    }
 
     showSuccessModal.value = true
 
