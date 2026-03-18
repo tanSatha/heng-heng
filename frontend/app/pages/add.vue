@@ -62,10 +62,8 @@ const form = ref({
   templeName: '',
   drawDateThai: getNextThaiDraw(),
   drawDateLao: getNextLaoDraw(),
-  photoThaiUrl1: '',
-  photoThaiUrl2: '',
-  photoLaoUrl1: '',
-  photoLaoUrl2: '',
+  photoUrl1: '',
+  photoUrl2: '',
 })
 
 const closeSuccessModal = () => {
@@ -101,8 +99,6 @@ const handleSubmit = async () => {
 
     await Promise.all(types.map(type => {
       const drawDate = type === 'THAI' ? form.value.drawDateThai : form.value.drawDateLao
-      const photoUrl1 = type === 'THAI' ? form.value.photoThaiUrl1 : form.value.photoLaoUrl1
-      const photoUrl2 = type === 'THAI' ? form.value.photoThaiUrl2 : form.value.photoLaoUrl2
       return $fetch(`${runtimeConfig.public.apiBase}/lottery`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${authStore.token}` },
@@ -111,8 +107,8 @@ const handleSubmit = async () => {
           type,
           draw_date: new Date(drawDate).toISOString(),
           temple_name: form.value.templeName,
-          photo_url: photoUrl1,
-          photo_url_2: photoUrl2
+          photo_url: form.value.photoUrl1,
+          photo_url_2: form.value.photoUrl2
         }
       })
     }))
@@ -167,16 +163,8 @@ const handleSubmit = async () => {
       />
       
       <ImageUploader
-        v-if="form.types.includes('THAI')"
-        v-model:photoUrl1="form.photoThaiUrl1"
-        v-model:photoUrl2="form.photoThaiUrl2"
-        :label="form.types.length === 2 ? '🇹🇭 รูปหวยรัฐบาลไทย (2 รูป)' : undefined"
-      />
-      <ImageUploader
-        v-if="form.types.includes('LAO')"
-        v-model:photoUrl1="form.photoLaoUrl1"
-        v-model:photoUrl2="form.photoLaoUrl2"
-        :label="form.types.length === 2 ? '🇱🇦 รูปหวยลาวพัฒนา (2 รูป)' : undefined"
+        v-model:photoUrl1="form.photoUrl1"
+        v-model:photoUrl2="form.photoUrl2"
       />
 
     </div>
