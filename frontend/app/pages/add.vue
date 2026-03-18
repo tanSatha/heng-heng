@@ -20,16 +20,62 @@ const showSuccessModal = ref(false)
 const showErrorModal = ref(false)
 const errorMessage = ref('กรุณาลองใหม่อีกครั้ง')
 
+const toDateStr = (d: Date) => {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+const getNextThaiDraw = () => {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const d = today.getDate()
+  const m = today.getMonth()
+  const y = today.getFullYear()
+  if (d < 1 || d < 16) {
+    // next is 16th this month or 1st next month
+    const next16 = new Date(y, m, 16)
+    if (next16 >= today) return toDateStr(next16)
+  }
+  if (d < 16) return toDateStr(new Date(y, m, 16))
+  if (d === 16 || d > 1) {
+    const next1 = new Date(y, m + 1, 1)
+    if (next1 >= today) return toDateStr(next1)
+  }
+  return toDateStr(new Date(y, m + 1, 1))
+}
+
+const getNextLaoDraw = () => {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  // Mon=1, Wed=3, Fri=5 (getDay: 0=Sun,1=Mon,...,5=Fri,6=Sat)
+  const drawDays = [1, 3, 5]
+  const d = new Date(today)
+  for (let i = 0; i <= 7; i++) {
+    if (drawDays.includes(d.getDay())) return toDateStr(d)
+    d.setDate(d.getDate() + 1)
+  }
+  return toDateStr(today)
+}
+
+const getNextDrawDate = (type: string) =>
+  type === 'LAO' ? getNextLaoDraw() : getNextThaiDraw()
+
 // Form State
 const form = ref({
   type: 'THAI',
   number1: '',
   number2: '',
   templeName: '',
-  drawDate: new Date().toISOString().split('T')[0],
-  photoUrl: '', 
+  drawDate: getNextThaiDraw(),
+  photoUrl: '',
   photoUrl1: '',
   photoUrl2: ''
+})
+
+watch(() => form.value.type, (newType) => {
+  form.value.drawDate = getNextDrawDate(newType)
 })
 
 const closeSuccessModal = () => {

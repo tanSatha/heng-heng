@@ -11,8 +11,13 @@ export class AuthService {
     private jwtService: JwtService
   ) {}
 
-  async validateUser(email: string, pass: string): Promise<any> {
-    const user = await this.prisma.user.findUnique({ where: { email } });
+  async validateUser(identifier: string, pass: string): Promise<any> {
+    const isPhone = /^[0-9+\-\s()]{8,15}$/.test(identifier.trim());
+    const user = await this.prisma.user.findFirst({
+      where: isPhone
+        ? { phone: identifier.trim() }
+        : { email: identifier.trim().toLowerCase() },
+    });
     if (user && user.password) {
       const isMatch = await bcrypt.compare(pass, user.password);
       if (isMatch) {
@@ -44,16 +49,26 @@ export class AuthService {
     };
   }
 
-  async register(email: string, pass: string) {
-    const existing = await this.prisma.user.findUnique({ where: { email } });
-    if (existing) {
-      throw new ConflictException('Email already exists');
+  async register(email: string | undefined, pass: string, phone?: string) {
+    if (!email && !phone) {
+      throw new ConflictException('Email or phone is required');
+    }
+
+    if (email) {
+      const existing = await this.prisma.user.findUnique({ where: { email } });
+      if (existing) throw new ConflictException('Email already exists');
+    }
+
+    if (phone) {
+      const phoneExists = await this.prisma.user.findUnique({ where: { phone } });
+      if (phoneExists) throw new ConflictException('Phone already exists');
     }
 
     const hashedPassword = await bcrypt.hash(pass, 10);
     const user = await this.prisma.user.create({
       data: {
-        email,
+        ...(email ? { email } : {}),
+        ...(phone ? { phone } : {}),
         password: hashedPassword,
       },
     });

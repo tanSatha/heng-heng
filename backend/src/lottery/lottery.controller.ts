@@ -10,6 +10,9 @@ import { LotteryType } from '@prisma/client';
 import { firstValueFrom } from 'rxjs';
 import { SupabaseService } from '../supabase.service';
 
+const nearbyCache = new Map<string, { data: any[]; ts: number }>();
+const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+
 @Controller('lottery')
 export class LotteryController {
   constructor(
@@ -66,6 +69,13 @@ export class LotteryController {
       return [];
     }
 
+    // Cache key: round to ~1km precision
+    const cacheKey = `${Number(lat).toFixed(2)}_${Number(lng).toFixed(2)}_${keyword || 'วัด'}`;
+    const cached = nearbyCache.get(cacheKey);
+    if (cached && Date.now() - cached.ts < CACHE_TTL) {
+      return cached.data.slice(0, limitParams);
+    }
+
     const calcDist = (pLat: number, pLon: number) => {
       const R = 6371;
       const dLat = (pLat - Number(lat)) * Math.PI / 180;
@@ -114,7 +124,9 @@ export class LotteryController {
 
       if (!data?.results?.length) return [];
 
-      return formatResults(data.results);
+      const result = formatResults(data.results);
+      nearbyCache.set(cacheKey, { data: result, ts: Date.now() });
+      return result.slice(0, limitParams);
 
     } catch (error) {
       console.error('Google Places API Error:', error.message);

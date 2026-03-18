@@ -38,7 +38,8 @@ export class AuthController {
 
   @Post('login')
   async login(@Body() req) {
-    const user = await this.authService.validateUser(req.email, req.password);
+    const identifier = req.identifier || req.email;
+    const user = await this.authService.validateUser(identifier, req.password);
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
     }
@@ -47,7 +48,7 @@ export class AuthController {
 
   @Post('register')
   async register(@Body() req) {
-    return this.authService.register(req.email, req.password);
+    return this.authService.register(req.email || undefined, req.password, req.phone || undefined);
   }
 
   @Get('google')

@@ -10,9 +10,16 @@ definePageMeta({
 })
 
 const loading = ref('')
-const email = ref('')
+const mode = ref<'email' | 'phone'>('email')
+const identifier = ref('')
 const password = ref('')
 const errorMsg = ref('')
+
+const switchMode = (m: 'email' | 'phone') => {
+  mode.value = m
+  identifier.value = ''
+  errorMsg.value = ''
+}
 
 // Check if already logged in
 if (authStore.isAuthenticated) {
@@ -30,25 +37,24 @@ const loginWithGoogle = () => {
 const loginWithEmail = async () => {
   loading.value = 'email'
   errorMsg.value = ''
-  
+
   try {
     const res = await $fetch<{ access_token: string }>(`${config.public.apiBase}/auth/login`, {
       method: 'POST',
-      body: { email: email.value, password: password.value }
+      body: { identifier: identifier.value, password: password.value }
     })
-    
+
     if (res.access_token) {
       authStore.setToken(res.access_token)
-      authStore.setUser({ email: email.value }) // In a real app, fetch /auth/me
-      
+      authStore.setUser({ email: identifier.value })
       navigateTo('/home')
     }
   } catch (err: any) {
     console.error(err)
     if (err.statusCode === 401) {
-      errorMsg.value = 'อีเมลหรือรหัสผ่านไม่ถูกต้อง / Invalid credentials'
+      errorMsg.value = 'อีเมล / เบอร์โทร หรือรหัสผ่านไม่ถูกต้อง'
     } else {
-      errorMsg.value = 'เกิดข้อผิดพลาดในการเชื่อมต่อ / Connection error'
+      errorMsg.value = 'เกิดข้อผิดพลาดในการเชื่อมต่อ'
     }
   } finally {
     loading.value = ''
@@ -109,38 +115,54 @@ const loginWithEmail = async () => {
           </button>
         </div>
 
-        <!-- Email/Password Login -->
+        <!-- Tab selector -->
+        <div class="flex p-1 bg-gray-100 rounded-2xl mb-5">
+          <button type="button" @click="switchMode('email')"
+            :class="['flex-1 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2',
+              mode === 'email' ? 'bg-white shadow text-purple-700' : 'text-gray-400 hover:text-gray-600']">
+            <UIcon name="i-heroicons-envelope" class="text-base" />
+            อีเมล
+          </button>
+          <button type="button" @click="switchMode('phone')"
+            :class="['flex-1 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2',
+              mode === 'phone' ? 'bg-white shadow text-purple-700' : 'text-gray-400 hover:text-gray-600']">
+            <UIcon name="i-heroicons-phone" class="text-base" />
+            เบอร์มือถือ
+          </button>
+        </div>
+
+        <!-- Login Form -->
         <form @submit.prevent="loginWithEmail" class="space-y-4">
-          <div>
-            <label class="heng-label">อีเมล / Email</label>
+          <div v-if="mode === 'email'">
+            <label class="heng-label">อีเมล</label>
             <div class="relative">
               <div class="input-icon">
                 <UIcon name="i-heroicons-envelope" class="text-lg" style="color: #9333ea;" />
               </div>
-              <input
-                v-model="email"
-                type="email"
-                placeholder="example@email.com"
-                class="heng-input"
-                required
-              />
+              <input v-model="identifier" type="email" placeholder="example@email.com"
+                class="heng-input" required autocomplete="email" />
             </div>
           </div>
+          <div v-else>
+            <label class="heng-label">เบอร์มือถือ</label>
+            <div class="relative">
+              <div class="input-icon">
+                <UIcon name="i-heroicons-phone" class="text-lg" style="color: #9333ea;" />
+              </div>
+              <input v-model="identifier" type="tel" placeholder="0812345678"
+                class="heng-input" required inputmode="numeric" autocomplete="tel" />
+            </div>
+          </div>
+
           <div>
-            <label class="heng-label">รหัสผ่าน / Password</label>
+            <label class="heng-label">รหัสผ่าน</label>
             <div class="relative">
               <div class="input-icon">
                 <UIcon name="i-heroicons-lock-closed" class="text-lg" style="color: #9333ea;" />
               </div>
-              <input
-                v-model="password"
-                type="password"
-                placeholder="••••••••"
-                class="heng-input"
-                required
-              />
+              <input v-model="password" type="password" placeholder="••••••••"
+                class="heng-input" required autocomplete="current-password" />
             </div>
-            <!-- Forgot Password Link -->
             <div class="flex justify-end mt-1">
               <NuxtLink to="/forgot-password" class="text-xs text-amber-600 hover:text-amber-800 hover:underline transition-colors">
                 ลืมรหัสผ่าน?
@@ -148,11 +170,8 @@ const loginWithEmail = async () => {
             </div>
           </div>
 
-          <button
-            type="submit"
-            :disabled="!!loading"
-            class="btn-gold w-full py-3.5 rounded-xl text-base mt-2"
-          >
+          <button type="submit" :disabled="!!loading"
+            class="btn-gold w-full py-3.5 rounded-xl text-base mt-2">
             {{ loading === 'email' ? 'กำลังเข้าระบบ...' : '🔑 เข้าสู่ระบบ' }}
           </button>
         </form>
